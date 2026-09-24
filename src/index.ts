@@ -24,8 +24,14 @@ export async function register(app: SpruceNodeApp): Promise<void> {
       rooms.push(`user:${userId}`);
     }
 
-    const eventPayload: { itemCount: number; userId?: number; channel?: string } = {
+    const eventPayload: {
+      itemCount: number;
+      items: CartItem[];
+      userId?: number;
+      channel?: string;
+    } = {
       itemCount,
+      items: asItems(payload.items),
     };
     if (userId > 0) {
       eventPayload.userId = userId;
@@ -47,6 +53,35 @@ export default {
   name,
   register,
 } satisfies SpruceNodeModule;
+
+interface CartItem {
+  source: string;
+  externalId: number;
+  qty: number;
+}
+
+function asItems(value: unknown): CartItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const items: CartItem[] = [];
+  for (const row of value) {
+    if (!row || typeof row !== 'object') {
+      continue;
+    }
+    const record = row as Record<string, unknown>;
+    const source = String(record.source ?? '').trim();
+    const externalId = asPositiveInt(record.external_id ?? record.externalId);
+    const qty = asCount(record.qty);
+    if (source === '' || externalId === 0 || qty === undefined || qty < 1) {
+      continue;
+    }
+    items.push({ source, externalId, qty });
+  }
+
+  return items;
+}
 
 function asCount(value: unknown): number | undefined {
   if (value == null || value === '') {
